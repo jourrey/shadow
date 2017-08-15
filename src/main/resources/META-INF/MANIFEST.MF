@@ -1,5 +1,0 @@
-Manifest-Version: 1.0
-Premain-Class: com.dianping.shadow.aspect.instrument.LoadAgent
-Agent-Class: com.dianping.shadow.aspect.instrument.LoadAgent
-Can-Redefine-Classes: true
-Can-Retransform-Classes: true
