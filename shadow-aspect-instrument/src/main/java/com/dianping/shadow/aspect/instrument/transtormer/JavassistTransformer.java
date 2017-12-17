@@ -34,17 +34,31 @@ public class JavassistTransformer implements ClassFileTransformer {
     private static final Logger LOG = LoggerFactory.getLogger(JavassistTransformer.class);
     private static final String FILE_SEPARATOR = File.separator;
     private static final String PACKAGE_SEPARATOR = ".";
+    /**
+     * Shadow添加的方法名称后缀
+     */
     private static final String TARGET_METHOD_NAME_SUFFIX = "$SHADOW";
+    /**
+     * 只是搜索JVM的同路径下的class
+     */
+    private static final ClassPool pool = ClassPool.getDefault();
+
+    {
+        //减少javassist的内存消耗
+        ClassPool.doPruning = true;
+        //运行在JBoss或者Tomcat下，ClassPool Object 可能找不到用户的classes。需要添加classpath
+        pool.insertClassPath(new ClassClassPath(this.getClass()));
+    }
 
     private static final ThreadLocal<Collection<String>> classNameList = new ThreadLocal<Collection<String>>() {
         public Collection<String> initialValue() {
             return Collections2.transform(AspectContext.getInstance().getJoinPoint()
                     , new Function<JoinPointBean, String>() {
-                @Override
-                public String apply(JoinPointBean input) {
-                    return input.getDeclaringClass().getCanonicalName();
-                }
-            });
+                        @Override
+                        public String apply(JoinPointBean input) {
+                            return input.getDeclaringClass().getCanonicalName();
+                        }
+                    });
         }
     };
 
@@ -52,11 +66,11 @@ public class JavassistTransformer implements ClassFileTransformer {
         public Collection<String> initialValue() {
             return Collections2.transform(AspectContext.getInstance().getJoinPoint()
                     , new Function<JoinPointBean, String>() {
-                @Override
-                public String apply(JoinPointBean input) {
-                    return input.getMember().getName();
-                }
-            });
+                        @Override
+                        public String apply(JoinPointBean input) {
+                            return input.getMember().getName();
+                        }
+                    });
         }
     };
 
@@ -70,10 +84,7 @@ public class JavassistTransformer implements ClassFileTransformer {
         }
         LOG.info("ClassFileTransformer className {}", className);
         try {
-            ClassPool.doPruning = true;//减少javassist的内存消耗
-            ClassPool pool = ClassPool.getDefault();//只是搜索JVM的同路径下的class
             //运行在JBoss或者Tomcat下，ClassPool Object 可能找不到用户的classes。需要添加classpath
-            pool.insertClassPath(new ClassClassPath(this.getClass()));
             pool.insertClassPath(new ByteArrayClassPath(className, classfileBuffer));
             CtClass targetClass = pool.get(className);// 使用全称,用于取得字节码类<使用javassist>
 //            targetClass.stopPruning(true);
@@ -150,62 +161,5 @@ public class JavassistTransformer implements ClassFileTransformer {
         }
         return null;
     }
-
-//    @Override
-//    public byte[] transform(ClassLoader loader, String className, Class<?> classBeingRedefined
-//            , ProtectionDomain protectionDomain, byte[] classfileBuffer) throws IllegalClassFormatException {
-//        className = className.replace(FILE_SEPARATOR, PACKAGE_SEPARATOR);
-//        if (!className.startsWith(basePackage)) {
-//            return null;
-//        }
-//        try {
-//            CtClass targetClass = ClassPool.getDefault().get(className);// 使用全称,用于取得字节码类<使用javassist>
-//            for (CtMethod targetMethod : targetClass.getDeclaredMethods()) {
-//                if (ArrayUtils.isNotEmpty(targetMethod.getParameterTypes())) {
-//                    System.out.println(targetMethod.getParameterTypes()[0].getName());
-//                } else {
-//                    System.out.println("No Parameter");
-//                }
-//                // 狸猫换太子
-//                String targetMethodName = targetMethod.getName();
-//                // 创建代理方法,复制原来的方法,名字为原来的名字
-//                CtMethod proxyMethod = CtNewMethod.copy(targetMethod, targetMethodName, targetClass, null);
-//                // 新定义一个方法叫做比如sayHello$old,将原来的方法名字修改
-//                targetMethodName = targetMethodName + TARGET_METHOD_NAME_SUFFIX;
-//                targetMethod.setName(targetMethodName);
-//
-//                // 构建代理方法体
-//                String returnType = targetMethod.getReturnType().getName();
-//                System.out.println("className:" + targetClass.getName());
-//                System.out.println("targetMethodName:" + targetMethodName);
-//                System.out.println("returnType:" + returnType);
-//                System.out.println("==============================");
-//                StringBuilder bodyStr = new StringBuilder();
-//                bodyStr.append("{\n");
-//                bodyStr.append("System.out.println(\"this class " + targetClass.getName() + "\");\n");
-//                bodyStr.append("Object[] param = $args;\n");
-//                bodyStr.append("System.out.println(\"this param \" + com.alibaba.fastjson.JSON.toJSONString(param));\n");
-//                if (!"void".equals(returnType)) {
-//                    bodyStr.append(returnType + " result = ");
-//                }
-//                bodyStr.append(targetMethodName + "($$);\n");// 调用原有代码，类似于method();($$)表示所有的参数
-//                if (!"void".equals(returnType)) {
-//                    bodyStr.append("System.out.println(\"this result \" + result);\n");
-//                    bodyStr.append("return result;\n");
-//                }
-//                bodyStr.append("}");
-//
-//                // 设置代理方法体
-//                proxyMethod.setBody(bodyStr.toString());
-//                // 向targetClass增加代理方法
-//                targetClass.addMethod(proxyMethod);
-//            }
-//            return targetClass.toBytecode();
-//        } catch (Exception e) {
-//            System.out.println(e.getMessage());
-//            e.printStackTrace();
-//        }
-//        return null;
-//    }
 
 }
